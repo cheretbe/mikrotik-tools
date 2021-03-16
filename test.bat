@@ -9,6 +9,6 @@ IF "%ProgramFiles(x86)%"=="" (
 )
 
 :: ECHO "%~dp0python%CPUArch%\python.exe" "%~dp0..\bin\glog" %*
-"%~dp0python\%CPUArch%\python.exe" %*
+"%~dp0python\%CPUArch%\python.exe" "%~dp0lib\download_config.py" %*
 
 ENDLOCAL
