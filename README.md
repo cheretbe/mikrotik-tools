@@ -3,7 +3,7 @@ contain custom `../packages` entry.
 
 ```batch
 :: Install/upgrade additional packages
-lib\python\x64\python.exe -m pip install --upgrade -t lib\python\packages -r requirements.txt
+lib\python\x64\python.exe -m pip install --upgrade -t lib\python\packages -r lib\requirements.txt
 ```
 
 * Initial pip installation
