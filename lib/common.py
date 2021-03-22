@@ -26,7 +26,7 @@ def exec_ssh_command(ssh_client, cmd, echo=True):
             break
         result += [line.rstrip()]
         if echo:
-            print(line, end="")
+            print("  " + line, end="")
     if stdout.channel.recv_exit_status() != 0:
         raise Exception(
             "SSH command returned non-zero exit status " +

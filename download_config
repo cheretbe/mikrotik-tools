@@ -33,6 +33,7 @@ rm $env_var_pipe
 
 "${HOME}/.cache/venv/mikrotik-tools-py3/bin/python3" \
   ${script_dir}/lib/get_credentials.py --env-var-pipe-handle ${pipe_fd}
+if [ $? -ne 0 ]; then return; fi
 
 # Write an empty line to the end of the pipe in case child process has crashed
 # and has never got a chance to write to the pipe. This will prevent current
