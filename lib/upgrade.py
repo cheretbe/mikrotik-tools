@@ -7,7 +7,9 @@ import base64
 import json
 import argparse
 import datetime
+import distutils.version
 import colorama
+import humanfriendly.prompts
 sys.path.append(os.path.dirname(__file__))
 import common
 
@@ -61,6 +63,37 @@ def main():
 
         ssh_client = common.ssh_connect(host, credentials)
 
+        print("  Checking firmware version")
+        firmware_data = common.exec_ssh_command(
+            ssh_client,
+            (
+                ":put [/system routerboard get upgrade-firmware];" +
+                ":put [/system routerboard get current-firmware]"
+            ),
+            echo=False
+        )
+        if firmware_data[0] == firmware_data[1]:
+            print(f"  Firmware {firmware_data[1]} doesn't need an upgrade")
+        else:
+            if (
+                    distutils.version.LooseVersion(firmware_data[0]) <
+                    distutils.version.LooseVersion(firmware_data[1])
+                ):
+                operation = "a DOWNGRADE"
+            else:
+                operation = "an upgrade"
+            print(
+                f"  Firmware needs {operation} from version {firmware_data[1]} "
+                f"to version {firmware_data[0]}"
+            )
+            if not humanfriendly.prompts.prompt_for_confirmation(
+                    f"Continue with {operation}?", default=True
+            ):
+                sys.exit("Cancelled by user")
+            common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
+            # /log print where topics="system;info;critical"
+            sys.exit(0)
+
         print("  Getting current release channel")
         channel = common.exec_ssh_command(
             ssh_client,
@@ -71,12 +104,14 @@ def main():
         if channel not in ["stable", "long-term"]:
             sys.exit("ERROR: unsupported release channel: " + channel)
 
+        sys.exit(0)
+
         bin_backup_dst = host + "_old.backup"
         config_backup_dst = host + "_old.rsc"
 
         bin_backup, config_backup = common.get_backup_file_names(ssh_client)
 
-        print("Backing up current settings")
+        print("  Backing up current settings")
 
         print(f"  Creating '{bin_backup}'")
         common.exec_ssh_command(ssh_client, "/system backup save name=" + bin_backup)
