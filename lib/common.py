@@ -7,8 +7,12 @@ import humanfriendly.prompts
 if sys.platform == 'win32':
     import ctypes.wintypes
 
+class SSHCommandStatusError(Exception):
+    """Custom exception class for SSH command returning non-zero exit status"""
+
+
 def ssh_connect(ssh_host, credentials):
-    ssh_client=paramiko.SSHClient()
+    ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh_client.connect(
         hostname=ssh_host, username=credentials["username"], password=credentials["password"]
@@ -28,7 +32,7 @@ def exec_ssh_command(ssh_client, cmd, echo=True):
         if echo:
             print("  " + line, end="")
     if stdout.channel.recv_exit_status() != 0:
-        raise Exception(
+        raise SSHCommandStatusError(
             "SSH command returned non-zero exit status " +
             str(stdout.channel.recv_exit_status())
         )
