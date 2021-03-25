@@ -112,14 +112,13 @@ def main():
                     f"  Firmware needs {operation} from version {firmware_data[2]} "
                     f"to version {firmware_data[1]}"
                 )
-                if not humanfriendly.prompts.prompt_for_confirmation(
+                if humanfriendly.prompts.prompt_for_confirmation(
                         f"Continue with {operation}?", default=True
                 ):
-                    sys.exit("Cancelled by user")
-                common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
-                wait_for_firmware_upgrade(ssh_client)
-                reboot_host(ssh_client, host)
-                continue
+                    common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
+                    wait_for_firmware_upgrade(ssh_client)
+                    reboot_host(ssh_client, host)
+                    continue
 
         print("  Getting current release channel")
         channel = common.exec_ssh_command(
@@ -156,7 +155,7 @@ def main():
         if "latest-version" not in upgrade_data:
             sys.exit(f"ERROR: Couldn't get packages upgrade status ({upgrade_data['status']})")
         if upgrade_data["installed-version"] == upgrade_data["latest-version"]:
-            print("  System is up to date")
+            print(f"  System is up to date ({upgrade_data['installed-version']})")
         else:
             if (
                     distutils.version.LooseVersion(upgrade_data["installed-version"]) <
