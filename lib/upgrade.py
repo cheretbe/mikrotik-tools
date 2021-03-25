@@ -55,11 +55,6 @@ def main():
     if not credentials["username"]:
         sys.exit("ERROR: Empty user name has been provided")
 
-    dest_path = (
-        pathlib.Path(common.get_documents_path()) / "mikrotik-tools" /
-        datetime.datetime.now().strftime("%Y-%m-%d")
-    )
-
     config_file_name = common.get_config_file_path()
     if os.path.isfile(config_file_name):
         with open(config_file_name) as conf_f:
@@ -186,43 +181,14 @@ def main():
                     ),
                     default=default_answer
             ):
-                # TODO: [!!!] Backup goes here
+                common.save_backup(host, ssh_client)
+
                 print("  Downloading update")
                 common.exec_ssh_command(ssh_client, "/system package update download as-value")
                 reboot_host(ssh_client, host)
             else:
                 continue
-
-        continue
-        bin_backup_dst = host + "_old.backup"
-        config_backup_dst = host + "_old.rsc"
-
-        bin_backup, config_backup = common.get_backup_file_names(ssh_client)
-
-        print("  Backing up current settings")
-
-        print(f"  Creating '{bin_backup}'")
-        common.exec_ssh_command(ssh_client, "/system backup save name=" + bin_backup)
-
-        print(f"  Creating '{config_backup}'")
-        common.exec_ssh_command(ssh_client, "/export terse file=" + config_backup)
-
-        print(f"  Saving config to '{str(dest_path)}'")
-        os.makedirs(dest_path, exist_ok=True)
-
-        sftp_client = ssh_client.open_sftp()
-
-        print(f"  Downloading '{bin_backup}' as '{bin_backup_dst}'")
-        sftp_client.get(bin_backup, str(pathlib.Path(dest_path) / bin_backup_dst))
-        print(f"  Removing '{bin_backup}'")
-        sftp_client.remove(bin_backup)
-
-        print(f"  Downloading '{config_backup}' as '{config_backup_dst}'")
-        sftp_client.get(config_backup, str(pathlib.Path(dest_path) / config_backup_dst))
-        print(f"  Removing '{config_backup}'")
-        sftp_client.remove(config_backup)
-
-        sftp_client.close()
+        ssh_client.close()
 
         print(
             colorama.Fore.GREEN + colorama.Style.BRIGHT +

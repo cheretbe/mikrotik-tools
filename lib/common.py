@@ -54,7 +54,7 @@ def get_backup_file_names(ssh_client):
         if line.strip():
             file_names += [line.strip().split(" ")[1].split("=")[1]]
     # file_names += ["flash"]
-    file_template="flash/{}" if "flash" in file_names else "{}"
+    file_template = "flash/{}" if "flash" in file_names else "{}"
 
     return [
         unique_file(file_names, file_template, ".backup"),
@@ -68,7 +68,7 @@ def get_documents_path():
 
         buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
         ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, buf)
-        return(buf.value)
+        return buf.value
     else:
         return os.path.expanduser('~/Documents')
 
@@ -95,3 +95,45 @@ def select_host(recent_hosts):
         if not selection:
             sys.exit("ERROR: no host name has been supplied")
     return selection
+
+def save_backup(host, ssh_client, differential_mode=False):
+    dest_path = (
+        pathlib.Path(get_documents_path()) / "mikrotik-tools" /
+        datetime.datetime.now().strftime("%Y-%m-%d")
+    )
+
+    if differential_mode:
+        bin_backup_dst = host + "_old.backup"
+        config_backup_dst = host + "_old.rsc"
+        if (pathlib.Path(dest_path) / config_backup_dst).is_file():
+            print("  Old configuration exists. Creating an update")
+            bin_backup_dst = host + "_new.backup"
+            config_backup_dst = host + "_new.rsc"
+    else:
+        bin_backup_dst = host + ".backup"
+        config_backup_dst = host + ".rsc"
+
+    bin_backup, config_backup = get_backup_file_names(ssh_client)
+
+    print(f"  Creating '{bin_backup}'")
+    exec_ssh_command(ssh_client, "/system backup save name=" + bin_backup)
+
+    print(f"  Creating '{config_backup}'")
+    exec_ssh_command(ssh_client, "/export terse file=" + config_backup)
+
+    print(f"  Saving config to '{str(dest_path)}'")
+    os.makedirs(dest_path, exist_ok=True)
+
+    sftp_client = ssh_client.open_sftp()
+
+    print(f"  Downloading '{bin_backup}' as '{bin_backup_dst}'")
+    sftp_client.get(bin_backup, str(pathlib.Path(dest_path) / bin_backup_dst))
+    print(f"  Removing '{bin_backup}'")
+    sftp_client.remove(bin_backup)
+
+    print(f"  Downloading '{config_backup}' as '{config_backup_dst}'")
+    sftp_client.get(config_backup, str(pathlib.Path(dest_path) / config_backup_dst))
+    print(f"  Removing '{config_backup}'")
+    sftp_client.remove(config_backup)
+
+    sftp_client.close()
