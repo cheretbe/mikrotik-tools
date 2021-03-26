@@ -95,8 +95,8 @@ def main():
             ),
             echo=False
         )
-        if firmware_data[0] == "x86":
-            print("  Skipping firmware upgrade for x86 platform")
+        if firmware_data[0] in ["x86", "x86_64"]:
+            print(f"  Skipping firmware upgrade for {firmware_data[0]} platform")
         else:
             if firmware_data[1] == firmware_data[2]:
                 print(f"  Firmware {firmware_data[2]} doesn't need an upgrade")
