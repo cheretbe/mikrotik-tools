@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ "${BASH_SOURCE[0]}" -ef "$0" ]; then
+  echo >&2 "ERROR: This script needs to be sourced to run correctly"
+  exit 1
+fi
+
+debug_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+script_dir=${debug_script_dir}/../../
+${debug_script_dir}/../../lib/setup_venv.sh
+
+. ${debug_script_dir}/../../lib/get_credentials.sh AO_MIKROTIK_CREDENTIALS
+
+"${HOME}/.cache/venv/mikrotik-tools-py3/bin/python3" \
+  ${debug_script_dir}/do_reboot.py "$@"
