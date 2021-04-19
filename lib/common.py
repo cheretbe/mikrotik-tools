@@ -2,7 +2,9 @@ import sys
 import os
 import datetime
 import pathlib
+import time
 import paramiko
+import colorama
 import humanfriendly.prompts
 if sys.platform == 'win32':
     import ctypes.wintypes
@@ -137,3 +139,36 @@ def save_backup(host, ssh_client, differential_mode=False):
     sftp_client.remove(config_backup)
 
     sftp_client.close()
+
+def reboot_host(ssh_client, host, credentials):
+    print(
+        colorama.Fore.YELLOW + colorama.Style.BRIGHT +
+        f"{host}: rebooting" +
+        colorama.Style.RESET_ALL
+    )
+    try:
+        # Exit status will be error due to disconnect during reboot
+        exec_ssh_command(ssh_client, "/system reboot")
+    except SSHCommandStatusError:
+        pass
+    ssh_client.close()
+
+    print(f"  Waiting for host {host} to reboot")
+    # Seems to fix message "Socket exception: Connection reset by peer (104)"
+    # being printed even though we catching all exceptions
+    time.sleep(1)
+    # 36*5 ~ 3 min
+    for i in range(36):
+        try:
+            ssh_client.connect(
+                hostname=host,
+                username=credentials["username"],
+                password=credentials["password"],
+                timeout=2
+            )
+            break
+        except Exception:
+            pass
+        time.sleep(5)
+    else:
+        raise Exception("Timeout waiting for reconnection")

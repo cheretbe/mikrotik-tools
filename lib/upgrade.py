@@ -30,20 +30,6 @@ def wait_for_firmware_upgrade(ssh_client):
         time.sleep(2)
     sys.exit("ERROR: timeout waiting for upgrade")
 
-def reboot_host(ssh_client, host):
-    print(
-        colorama.Fore.YELLOW + colorama.Style.BRIGHT +
-        f"{host}: rebooting" +
-        colorama.Style.RESET_ALL
-    )
-    try:
-        # Exit status will be error due to disconnect during reboot
-        common.exec_ssh_command(ssh_client, "/system reboot")
-    except common.SSHCommandStatusError:
-        pass
-    ssh_client.close()
-
-
 def main():
     parser = argparse.ArgumentParser(description="Config backup utility for Mikrotik routers")
     parser.add_argument(
@@ -117,7 +103,7 @@ def main():
                 ):
                     common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
                     wait_for_firmware_upgrade(ssh_client)
-                    reboot_host(ssh_client, host)
+                    common.reboot_host(ssh_client, host)
                     continue
 
         print("  Getting current release channel")
@@ -184,7 +170,11 @@ def main():
 
                 print("  Downloading update")
                 common.exec_ssh_command(ssh_client, "/system package update download as-value")
-                reboot_host(ssh_client, host)
+                common.reboot_host(ssh_client, host, credentials)
+                version_after_update = common.exec_ssh_command(
+                    ssh_client, ":put [/system package update get installed-version]"
+                )
+                print(f"version_after_update: {version_after_update}")
             else:
                 continue
         ssh_client.close()
