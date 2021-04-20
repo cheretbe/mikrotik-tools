@@ -112,8 +112,13 @@ def save_backup(host, ssh_client, differential_mode=False):
             bin_backup_dst = host + "_new.backup"
             config_backup_dst = host + "_new.rsc"
     else:
-        bin_backup_dst = host + ".backup"
-        config_backup_dst = host + ".rsc"
+        ros_version = exec_ssh_command(
+            ssh_client,
+            cmd=":put [/system package update get installed-version]",
+            echo=False
+        )[0]
+        bin_backup_dst = f"{host}_{ros_version}.backup"
+        config_backup_dst = f"{host}_{ros_version}.rsc"
 
     bin_backup, config_backup = get_backup_file_names(ssh_client)
 
