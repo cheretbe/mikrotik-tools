@@ -17,7 +17,7 @@ import common
 
 colorama.init()
 
-def upgrade_firmware(host, ssh_client):
+def upgrade_firmware(host, ssh_client, credentials):
     print("  Checking firmware version")
     firmware_data = common.exec_ssh_command(
         ssh_client,
@@ -53,6 +53,83 @@ def upgrade_firmware(host, ssh_client):
                 common.reboot_host(ssh_client, host)
                 # TODO: Wait for reboot
 
+def upgrade_ros(host, ssh_client, credentials):
+    print("  Getting current release channel")
+    channel = common.exec_ssh_command(
+        ssh_client,
+        ":put [/system package update get channel]",
+        echo=False
+    )[0]
+    print(f"  Release channel: {channel}")
+    if channel not in ["stable", "long-term"]:
+        sys.exit("ERROR: unsupported release channel: " + channel)
+
+    if channel == "stable":
+        if humanfriendly.prompts.prompt_for_confirmation(
+                (
+                    "Would you like to change 'stable' release channel " +
+                    f"to 'long-term' on router '{host}'?"
+                ),
+                default=False
+        ):
+            print("  Changing release channel to 'long-term'")
+            common.exec_ssh_command(ssh_client, "/system package update set channel=long-term")
+
+    print("  Checking for packages upgrade")
+    upgrade_data = common.exec_ssh_command(
+        ssh_client,
+        (
+            "/system package update check-for-updates as-value;" +
+            ":put [/system package update get]"
+        ),
+        echo=False
+    )[0]
+    # "Name1=Value1;Name2=Value2" ==> {"Name1": "Value1", "Name2": "Value2"}
+    upgrade_data = dict(item.split("=") for item in upgrade_data.split(";"))
+    if "latest-version" not in upgrade_data:
+        sys.exit(f"ERROR: Couldn't get packages upgrade status ({upgrade_data['status']})")
+    if upgrade_data["installed-version"] == upgrade_data["latest-version"]:
+        print(f"  System is up to date ({upgrade_data['installed-version']})")
+    else:
+        if (
+                distutils.version.LooseVersion(upgrade_data["installed-version"]) <
+                distutils.version.LooseVersion(upgrade_data["latest-version"])
+            ):
+            print("  New version is available")
+            operation = "upgrade"
+            default_answer = True
+        else:
+            operation = "downgrade"
+            print(
+                colorama.Fore.YELLOW + colorama.Style.BRIGHT +
+                "WARNING: installed version is greater than latest released one" +
+                colorama.Style.RESET_ALL
+            )
+            default_answer = False
+        if humanfriendly.prompts.prompt_for_confirmation(
+                (
+                    f"Would you like to {operation} RouterOS from version " +
+                    f"{upgrade_data['installed-version']} to version "
+                    f"{upgrade_data['latest-version']} on router '{host}'?"
+                ),
+                default=default_answer
+        ):
+            common.save_backup(host, ssh_client)
+
+            print("  Downloading update")
+            common.exec_ssh_command(ssh_client, "/system package update download as-value")
+            common.reboot_host(ssh_client, host, credentials)
+            version_after_update = common.exec_ssh_command(
+                ssh_client,
+                cmd=":put [/system package update get installed-version]",
+                echo=False
+            )[0]
+            print(f"  Version after upgrade: {version_after_update}")
+            if version_after_update != upgrade_data["latest-version"]:
+                raise Exception(
+                    f"RouterOS version differs {version_after_update} "
+                    f"from expected version {upgrade_data['latest-version']}"
+                )
 
 def wait_for_firmware_upgrade(ssh_client):
     print("  Waiting for firmware upgrade to finish")
@@ -108,86 +185,10 @@ def main():
 
         ssh_client = common.ssh_connect(host, credentials)
 
-        upgrade_firmware(host, ssh_client)
+        upgrade_firmware(host, ssh_client, credentials)
 
-        print("  Getting current release channel")
-        channel = common.exec_ssh_command(
-            ssh_client,
-            ":put [/system package update get channel]",
-            echo=False
-        )[0]
-        print(f"  Release channel: {channel}")
-        if channel not in ["stable", "long-term"]:
-            sys.exit("ERROR: unsupported release channel: " + channel)
+        upgrade_ros(host, ssh_client, credentials)
 
-        if channel == "stable":
-            if humanfriendly.prompts.prompt_for_confirmation(
-                    (
-                        "Would you like to change 'stable' release channel " +
-                        f"to 'long-term' on router '{host}'?"
-                    ),
-                    default=False
-            ):
-                print("  Changing release channel to 'long-term'")
-                common.exec_ssh_command(ssh_client, "/system package update set channel=long-term")
-
-        print("  Checking for packages upgrade")
-        upgrade_data = common.exec_ssh_command(
-            ssh_client,
-            (
-                "/system package update check-for-updates as-value;" +
-                ":put [/system package update get]"
-            ),
-            echo=False
-        )[0]
-        # "Name1=Value1;Name2=Value2" ==> {"Name1": "Value1", "Name2": "Value2"}
-        upgrade_data = dict(item.split("=") for item in upgrade_data.split(";"))
-        if "latest-version" not in upgrade_data:
-            sys.exit(f"ERROR: Couldn't get packages upgrade status ({upgrade_data['status']})")
-        if upgrade_data["installed-version"] == upgrade_data["latest-version"]:
-            print(f"  System is up to date ({upgrade_data['installed-version']})")
-        else:
-            if (
-                    distutils.version.LooseVersion(upgrade_data["installed-version"]) <
-                    distutils.version.LooseVersion(upgrade_data["latest-version"])
-                ):
-                print("  New version is available")
-                operation = "upgrade"
-                default_answer = True
-            else:
-                operation = "downgrade"
-                print(
-                    colorama.Fore.YELLOW + colorama.Style.BRIGHT +
-                    "WARNING: installed version is greater than latest released one" +
-                    colorama.Style.RESET_ALL
-                )
-                default_answer = False
-            if humanfriendly.prompts.prompt_for_confirmation(
-                    (
-                        f"Would you like to {operation} RouterOS from version " +
-                        f"{upgrade_data['installed-version']} to version "
-                        f"{upgrade_data['latest-version']} on router '{host}'?"
-                    ),
-                    default=default_answer
-            ):
-                common.save_backup(host, ssh_client)
-
-                print("  Downloading update")
-                common.exec_ssh_command(ssh_client, "/system package update download as-value")
-                common.reboot_host(ssh_client, host, credentials)
-                version_after_update = common.exec_ssh_command(
-                    ssh_client,
-                    cmd=":put [/system package update get installed-version]",
-                    echo=False
-                )[0]
-                print(f"  Version after upgrade: {version_after_update}")
-                if version_after_update != upgrade_data["latest-version"]:
-                    raise Exception(
-                        f"RouterOS version differs {version_after_update} "
-                        f"from expected version {upgrade_data['latest-version']}"
-                    )
-            else:
-                continue
         ssh_client.close()
 
         print(
