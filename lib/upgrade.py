@@ -127,9 +127,10 @@ def upgrade_ros(host, ssh_client, credentials):
             print(f"  Version after upgrade: {version_after_update}")
             if version_after_update != upgrade_data["latest-version"]:
                 raise Exception(
-                    f"RouterOS version differs {version_after_update} "
+                    f"RouterOS version {version_after_update} differs "
                     f"from expected version {upgrade_data['latest-version']}"
                 )
+            common.save_backup(host, ssh_client)
 
 def wait_for_firmware_upgrade(ssh_client):
     print("  Waiting for firmware upgrade to finish")
