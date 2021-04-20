@@ -172,9 +172,16 @@ def main():
                 common.exec_ssh_command(ssh_client, "/system package update download as-value")
                 common.reboot_host(ssh_client, host, credentials)
                 version_after_update = common.exec_ssh_command(
-                    ssh_client, ":put [/system package update get installed-version]"
-                )
-                print(f"version_after_update: {version_after_update}")
+                    ssh_client,
+                    cmd=":put [/system package update get installed-version]",
+                    echo=False
+                )[0]
+                print(f"  Version after upgrade: {version_after_update}")
+                if version_after_update != upgrade_data["latest-version"]:
+                    raise Exception(
+                        f"RouterOS version differs {version_after_update} "
+                        f"from expected version {upgrade_data['latest-version']}"
+                    )
             else:
                 continue
         ssh_client.close()
