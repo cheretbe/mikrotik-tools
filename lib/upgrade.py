@@ -50,8 +50,25 @@ def upgrade_firmware(host, ssh_client, credentials):
             ):
                 common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
                 wait_for_firmware_upgrade(ssh_client)
-                common.reboot_host(ssh_client, host)
-                # TODO: Wait for reboot
+                common.reboot_host(ssh_client, host, credentials)
+                version_after_upgrade = common.exec_ssh_command(
+                    ssh_client,
+                    cmd=":put [/system routerboard get current-firmware]",
+                    echo=False
+                )[0]
+                print(f"  Firmware version after upgrade/downgrade: {version_after_upgrade}")
+                if version_after_upgrade != firmware_data[1]:
+                    raise Exception(
+                        f"Firmware version {version_after_upgrade} differs "
+                        f"from expected version {firmware_data[1]}"
+                    )
+                print(
+                    colorama.Fore.GREEN + colorama.Style.BRIGHT +
+                    f"{host}: successful firmware upgrade/downgrade from version " +
+                    f"{firmware_data[2]} to version {firmware_data[1]}" +
+                    colorama.Style.RESET_ALL
+                )
+
 
 def upgrade_ros(host, ssh_client, credentials):
     print("  Getting current release channel")
@@ -131,6 +148,13 @@ def upgrade_ros(host, ssh_client, credentials):
                     f"from expected version {upgrade_data['latest-version']}"
                 )
             common.save_backup(host, ssh_client)
+            print(
+                colorama.Fore.GREEN + colorama.Style.BRIGHT +
+                f"{host}: successful RouterOS {operation} from version " +
+                f"{upgrade_data['installed-version']} to version " +
+                f"{upgrade_data['latest-version']}" +
+                colorama.Style.RESET_ALL
+            )
 
 def wait_for_firmware_upgrade(ssh_client):
     print("  Waiting for firmware upgrade to finish")
@@ -146,7 +170,7 @@ def wait_for_firmware_upgrade(ssh_client):
     sys.exit("ERROR: timeout waiting for upgrade")
 
 def main():
-    parser = argparse.ArgumentParser(description="Config backup utility for Mikrotik routers")
+    parser = argparse.ArgumentParser(description="Upgrade utility for Mikrotik routers")
     parser.add_argument(
         "hosts", metavar="host_name", nargs="*", default="", help="Router name or IP address"
     )
@@ -186,14 +210,14 @@ def main():
 
         ssh_client = common.ssh_connect(host, credentials)
 
-        upgrade_firmware(host, ssh_client, credentials)
-
         upgrade_ros(host, ssh_client, credentials)
+
+        upgrade_firmware(host, ssh_client, credentials)
 
         ssh_client.close()
 
         print(
-            colorama.Fore.GREEN + colorama.Style.BRIGHT +
+            colorama.Fore.CYAN + colorama.Style.BRIGHT +
             f"{host}: done" +
             colorama.Style.RESET_ALL
         )
