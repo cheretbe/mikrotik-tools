@@ -17,6 +17,43 @@ import common
 
 colorama.init()
 
+def upgrade_firmware(host, ssh_client):
+    print("  Checking firmware version")
+    firmware_data = common.exec_ssh_command(
+        ssh_client,
+        (
+            ":put [/system resource get architecture-name];" +
+            ":put [/system routerboard get upgrade-firmware];" +
+            ":put [/system routerboard get current-firmware]"
+        ),
+        echo=False
+    )
+    if firmware_data[0] in ["x86", "x86_64"]:
+        print(f"  Skipping firmware upgrade for {firmware_data[0]} platform")
+    else:
+        if firmware_data[1] == firmware_data[2]:
+            print(f"  Firmware {firmware_data[2]} doesn't need an upgrade")
+        else:
+            if (
+                    distutils.version.LooseVersion(firmware_data[1]) <
+                    distutils.version.LooseVersion(firmware_data[2])
+                ):
+                operation = "a DOWNGRADE"
+            else:
+                operation = "an upgrade"
+            print(
+                f"  Firmware needs {operation} from version {firmware_data[2]} "
+                f"to version {firmware_data[1]}"
+            )
+            if humanfriendly.prompts.prompt_for_confirmation(
+                    f"Continue with {operation}?", default=True
+            ):
+                common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
+                wait_for_firmware_upgrade(ssh_client)
+                common.reboot_host(ssh_client, host)
+                # TODO: Wait for reboot
+
+
 def wait_for_firmware_upgrade(ssh_client):
     print("  Waiting for firmware upgrade to finish")
     for i in range(4):
@@ -71,40 +108,7 @@ def main():
 
         ssh_client = common.ssh_connect(host, credentials)
 
-        print("  Checking firmware version")
-        firmware_data = common.exec_ssh_command(
-            ssh_client,
-            (
-                ":put [/system resource get architecture-name];" +
-                ":put [/system routerboard get upgrade-firmware];" +
-                ":put [/system routerboard get current-firmware]"
-            ),
-            echo=False
-        )
-        if firmware_data[0] in ["x86", "x86_64"]:
-            print(f"  Skipping firmware upgrade for {firmware_data[0]} platform")
-        else:
-            if firmware_data[1] == firmware_data[2]:
-                print(f"  Firmware {firmware_data[2]} doesn't need an upgrade")
-            else:
-                if (
-                        distutils.version.LooseVersion(firmware_data[1]) <
-                        distutils.version.LooseVersion(firmware_data[2])
-                    ):
-                    operation = "a DOWNGRADE"
-                else:
-                    operation = "an upgrade"
-                print(
-                    f"  Firmware needs {operation} from version {firmware_data[2]} "
-                    f"to version {firmware_data[1]}"
-                )
-                if humanfriendly.prompts.prompt_for_confirmation(
-                        f"Continue with {operation}?", default=True
-                ):
-                    common.exec_ssh_command(ssh_client, "/system routerboard upgrade")
-                    wait_for_firmware_upgrade(ssh_client)
-                    common.reboot_host(ssh_client, host)
-                    continue
+        upgrade_firmware(host, ssh_client)
 
         print("  Getting current release channel")
         channel = common.exec_ssh_command(
