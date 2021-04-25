@@ -1,3 +1,12 @@
+```batch
+:: Windows
+subl %APPDATA%\mikrotik-tools\settings.json
+```
+```shell
+# Linux
+subl ~/.config/mikrotik-tools/settings.json
+```
+
 :warning: Note that both `lib\python\x64\python39._pth` and `lib\python\x64\python39._pth`
 contain custom `../packages` entry.
 
